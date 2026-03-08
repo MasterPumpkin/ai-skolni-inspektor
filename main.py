@@ -290,3 +290,28 @@ with zalozka_napoveda:
     * **Krok 4 (Náhled a ladění):** Běžte do záložky 3. Zde uvidíte přesně to, co odevzdal žák a co mu na to řekla AI. Pokud AI hodnotí moc mírně, upravte kritéria v záložce 2.
     * **Krok 5 (Hromadná oprava):** Jste spokojeni? Běžte zpět do záložky 2 a klikněte na **🚀 Spustit / Pokračovat**. AI teď opraví celou třídu a vy si dole stáhnete hotový Excel!
     """)
+
+    st.markdown("---")
+    st.markdown("### 💡 Vzorová kritéria (Prompty) pro inspiraci")
+    st.write("Pokud nechcete nechat AI vymýšlet kritéria automaticky v 1. záložce, můžete si do 2. záložky zkopírovat jeden z těchto vyladěných vzorů a jen si ho upravit na míru. Díky formátování do bloku kódu se vám vpravo nahoře v rámečku ukáže ikonka pro rychlé zkopírování.")
+
+    with st.expander("💻 Informatika a Programování"):
+        st.code("""Hodnotíš zdrojový kód žáka. Tvým cílem je zkontrolovat logiku a čistotu kódu. 
+1. Funkčnost: Řeší kód zadaný problém? Pokud ne, vysvětli žákovi, kde v logice udělal chybu.
+2. Čistota: Zkontroluj, zda žák používá smysluplné názvy proměnných a zda kód zbytečně neopakuje.
+3. Pravidlo: NIKDY žákovi nepiš hotový opravený kód! Pouze ho slovně naveď, co má změnit.
+4. Pokud kód funguje, ale je neelegantní, dej "Částečně splněno" a poraď optimalizaci.""", language="markdown")
+
+    with st.expander("📐 Matematika a Fyzika"):
+        st.code("""Hodnotíš matematický/fyzikální výpočet. Nezaměřuj se jen na finální číslo, ale analyzuj postup žáka.
+1. Postup: Je logicky správný? Použil žák správný vzorec?
+2. Numerické chyby: Pokud je postup správný, ale žák udělal hloupou chybu v násobení/sčítání, hodnoť jako "Částečně splněno", pochval ho za logiku a upozorni na chybu.
+3. Jednotky: Zkontroluj, zda žák na konci uvedl správné jednotky (např. cm², kg). Pokud chybí, upozorni na to.
+4. Pokud žák napsal jen správný výsledek bez postupu, hodnoť jako "Nesplněno" a napiš mu, že bez postupu nelze práci uznat.""", language="markdown")
+
+    with st.expander("✍️ Český jazyk a Sloh"):
+        st.code("""Hodnotíš slohovou práci žáka. Tvým úkolem je dát mu konstruktivní zpětnou vazbu ve 3 rovinách:
+1. Pravopis a gramatika: Vypíchni hrubé chyby. Vypiš konkrétní chybná slova, která žák napsal, a vysvětli pravidlo.
+2. Stylistika: Upozorni na nadměrné opakování stejných slov nebo krkolomné větné konstrukce. Navrhni bohatší synonyma.
+3. Dodržení tématu: Zhodnoť, zda žák neodbočil od původního zadání.
+4. Pravidlo: Nepřepisuj žákův text! Tvá zpětná vazba musí být stručná a povzbuzující. Pokud má text více než 5 hrubek, hodnoť jako "Nesplněno".""", language="markdown")
