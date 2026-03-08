@@ -42,22 +42,18 @@ def precti_obsah_souboru(nahrany_soubor) -> str:
     except Exception as e:
         return f"❌ CHYBA ČTENÍ: {str(e)}"
 
-# --- VYLEPŠENÝ UNIVERZÁLNÍ SANDBOX ---
 def spust_kod(jazyk: str, kod: str) -> str:
     url = "https://emkc.org/api/v2/piston/execute"
-    
-    # Sjednocení názvů jazyků pro API
     jazyk = jazyk.lower()
     if jazyk in ["js", "node"]: jazyk = "javascript"
     if jazyk in ["ts"]: jazyk = "typescript"
     if jazyk in ["c++"]: jazyk = "cpp"
     
-    # Bezpečné mapování stabilních verzí pro Piston
     verze_mapa = {
         "python": "3.10", "javascript": "18.15.0", "typescript": "5.0.3", 
         "php": "8.2.3", "cpp": "10.2.0", "c": "10.2.0", "java": "15.0.2"
     }
-    verze = verze_mapa.get(jazyk, "*") # Pokud jazyk neznáme, zkusíme nejnovější (*)
+    verze = verze_mapa.get(jazyk, "*")
 
     payload = {
         "language": jazyk,
@@ -98,10 +94,10 @@ if "spotrebovane_tokeny" not in st.session_state: st.session_state.spotrebovane_
 # 3. UI - BOČNÍ PANEL (VÝBĚR MODELU A TOKENY)
 # ==========================================
 st.set_page_config(page_title="AI Školní Inspektor", page_icon="🎓", layout="wide")
-st.title("🎓 AI Školní Inspektor v3.4")
+st.title("🎓 AI Školní Inspektor v1.0")
 
 st.sidebar.markdown("### ⚙️ Nastavení AI")
-poskytovatel = st.sidebar.selectbox("Poskytovatel AI:", ["Groq (Zdarma/Bleskový)", "OpenAI (Placené/Nejchytřejší)", "Ollama (Lokální zdarma)"])
+poskytovatel = st.sidebar.selectbox("Poskytovatel AI:", ["Groq (Zdarma/Bleskový)", "OpenAI (Placené/Nejchytřejší)"])
 
 klic_ok = False
 if poskytovatel == "Groq (Zdarma/Bleskový)":
@@ -109,23 +105,15 @@ if poskytovatel == "Groq (Zdarma/Bleskový)":
     base_url = "https://api.groq.com/openai/v1"
     model_ai = st.sidebar.selectbox("Model:", ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "mixtral-8x7b-32768"])
     if api_klic.startswith("gsk_"): klic_ok = True
-
-elif poskytovatel == "OpenAI (Placené/Nejchytřejší)":
+else:
     api_klic = st.sidebar.text_input("🔑 OpenAI API klíč:", type="password")
     base_url = "https://api.openai.com/v1"
     model_ai = st.sidebar.selectbox("Model:", ["gpt-4o-mini", "gpt-4o"])
     if api_klic.startswith("sk-"): klic_ok = True
 
-else: # Ollama
-    api_klic = "ollama"
-    base_url = "http://localhost:11434/v1"
-    model_ai = st.sidebar.text_input("Název lokálního modelu:", value="llama3.1")
-    klic_ok = True
-    st.sidebar.warning("⚠️ Pozor: Ollama funguje pouze lokálně.")
-
 st.sidebar.markdown("---")
 st.sidebar.metric("🪙 Spotřebované tokeny", f"{st.session_state.spotrebovane_tokeny:,}".replace(",", " "))
-st.sidebar.caption("Počítá se text zadání i odpovědi modelu. (Ollama tokeny nevrací).")
+st.sidebar.caption("Počítá se text zadání i odpovědi modelu.")
 
 if not klic_ok:
     st.info("👈 Vítejte! Pro zpřístupnění všech funkcí rozbalte boční panel a zadejte svůj API klíč.")
@@ -169,9 +157,7 @@ with zalozka_hodnoceni:
         zadani = st.text_area("Zadání pro žáky:", value=st.session_state.gen_zadani, height=100)
         reseni = st.text_area("Vzorové řešení:", value=st.session_state.gen_reseni, height=100)
         instrukce = st.text_area("Kritéria (prompt):", value=st.session_state.gen_instrukce, height=150)
-        
-        # --- ZMĚNĚNÝ TEXT PRO SANDBOX ---
-        pouzit_sandbox = st.checkbox("⚙️ Aktivovat Sandbox (Zaškrtněte POUZE pokud chcete nechat AI reálně spustit žákův kód pro kontrolu funkčnosti. Pro běžnou kontrolu syntaxe to není potřeba a zpomaluje to běh.)")
+        pouzit_sandbox = st.checkbox("⚙️ Aktivovat Sandbox (pouze pro reálné spuštění kódu programátorů)")
     
     with col2:
         st.warning("🔒 **GDPR Ochrana:** Nenahrávejte soubory obsahující osobní údaje žáků.")
@@ -182,7 +168,6 @@ with zalozka_hodnoceni:
         btn_test = c1.button("🧪 Test (1 žák)")
         btn_start = c2.button("🚀 Spustit / Pokračovat", type="primary")
         btn_reset = c3.button("🔄 Začít znovu (smazat)")
-        btn_stop = st.button("🛑 Nouzově zastavit", type="secondary")
 
         if btn_reset:
             st.session_state.hotove_vysledky = []
@@ -190,8 +175,6 @@ with zalozka_hodnoceni:
             st.session_state.posledni_analyza_vysledek = ""
             st.session_state.spotrebovane_tokeny = 0
             st.rerun()
-            
-        if btn_stop: st.warning("Systém byl ručně zastaven. Vaše dosavadní výsledky jsou uloženy níže.")
 
         if btn_test or btn_start:
             if not klic_ok or not zak_soubory: st.error("Chybí správný klíč nebo soubory!")
@@ -244,7 +227,6 @@ Zpětná vazba: [2 věty k žákovi]"""
                             if msg.tool_calls:
                                 for tc in msg.tool_calls:
                                     args = json.loads(tc.function.arguments)
-                                    # Dynamické získání jazyka a kódu od modelu
                                     jazyk_kodu = args.get("jazyk", "python")
                                     zdrojovy_kod = args.get("kod", "")
                                     res = spust_kod(jazyk_kodu, zdrojovy_kod) if tc.function.name == "spust_kod" else "Neznámý nástroj."
