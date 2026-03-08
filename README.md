@@ -9,7 +9,6 @@ Aplikace umí přečíst vzorové řešení od učitele, sama z něj odvodit hod
 **🤖 Multi-Model Podpora:** Možnost plynule přepínat mezi poskytovateli:
 * **Groq:** Bleskově rychlé a pro učitele (v rámci limitů) zdarma.
 * **OpenAI:** Přístup k nejpokročilejším modelům (GPT-4o) pro složité úlohy.
-* **Ollama:** 100% lokální spuštění bez odesílání dat do cloudu (vyžaduje výkonný HW).
 
 **📄 Univerzální čtečka formátů:** Podpora pro čistý text, zdrojové kódy (`.py`), Jupyter Notebooky (`.ipynb` – s inteligentním čištěním metadat), Word dokumenty (`.docx`) a PDF (`.pdf`).
 
