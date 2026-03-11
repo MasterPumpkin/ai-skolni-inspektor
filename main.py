@@ -105,7 +105,16 @@ else:
     if api_klic.startswith("sk-"): klic_ok = True
 
 st.sidebar.markdown("---")
-st.sidebar.metric("🪙 Spotřebované tokeny", f"{st.session_state.spotrebovane_tokeny:,}".replace(",", " "))
+# PŘIDÁNO: Placeholder pro živou aktualizaci tokenů
+token_metric_container = st.sidebar.empty()
+
+def update_token_ui():
+    token_metric_container.metric(
+        "🪙 Spotřebované tokeny", 
+        f"{st.session_state.spotrebovane_tokeny:,}".replace(",", " ")
+    )
+
+update_token_ui()
 st.sidebar.caption("Počítá se text zadání i odpovědi modelu.")
 
 if not klic_ok:
@@ -137,6 +146,7 @@ with zalozka_priprava:
                     u = getattr(resp, 'usage', None)
                     if u:
                         st.session_state.spotrebovane_tokeny += getattr(u, 'total_tokens', getattr(u, 'prompt_tokens', 0) + getattr(u, 'completion_tokens', 0))
+                        update_token_ui()
                     
                     txt = resp.choices[0].message.content or "{}"
                     try:
@@ -243,6 +253,7 @@ JSON musí obsahovat PŘESNĚ tyto dva klíče:
                             u = getattr(resp, 'usage', None)
                             if u:
                                 st.session_state.spotrebovane_tokeny += getattr(u, 'total_tokens', getattr(u, 'prompt_tokens', 0) + getattr(u, 'completion_tokens', 0))
+                                update_token_ui()
                             
                             msg = resp.choices[0].message
                             # PŘIDÁNO: Robustní parsování JSON výsledku
