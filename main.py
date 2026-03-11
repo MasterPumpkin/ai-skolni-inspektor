@@ -181,9 +181,8 @@ JSON musí obsahovat PŘESNĚ tyto dva klíče:
                     st.session_state.posledni_analyza = obsah_zaka 
                     
                     if obsah_zaka.startswith("❌ CHYBA"):
-                        fin = obsah_zaka
-                        st.session_state.posledni_analyza_vysledek = fin
-                        if btn_start: st.session_state.hotove_vysledky.append({"Žák": soubor.name, "Hodnocení": fin})
+                        st.session_state.posledni_analyza_vysledek = obsah_zaka
+                        if btn_start: st.session_state.hotove_vysledky.append({"Žák": soubor.name, "Výsledek": "CHYBA", "Zpětná vazba": obsah_zaka})
                         prog.progress((idx+1)/len(fronta))
                         continue
                     
@@ -212,11 +211,20 @@ JSON musí obsahovat PŘESNĚ tyto dva klíče:
                             raw_content = msg.content if msg.content else "{}"
                             try:
                                 parsed = json.loads(raw_content)
-                                v_score = parsed.get("score", "Neznámý výsledek")
-                                v_feedback = parsed.get("feedback", "Bez zpětné vazby.")
-                                fin = f"Výsledek: {v_score}\nZpětná vazba: {v_feedback}"
+                                v_score = str(parsed.get("score", "Neznámý výsledek"))
+                                v_feedback = str(parsed.get("feedback", "Bez zpětné vazby."))
                             except:
-                                fin = f"⚠️ Chyba formátu JSON. Původní text:\n{raw_content}"
+                                v_score = "CHYBA"
+                                v_feedback = f"⚠️ Chyba formátu JSON. Původní text:\n{raw_content}"
+                            
+                            st.session_state.posledni_analyza_vysledek = f"Výsledek: {v_score}\nZpětná vazba: {v_feedback}"
+                            fin = st.session_state.posledni_analyza_vysledek
+                            if btn_start: 
+                                st.session_state.hotove_vysledky.append({
+                                    "Žák": soubor.name, 
+                                    "Výsledek": v_score, 
+                                    "Zpětná vazba": v_feedback
+                                })
                             break # Úspěch, vymaníme se z retry logiky pro síť
                             
                         except RateLimitError:
@@ -230,9 +238,15 @@ JSON musí obsahovat PŘESNĚ tyto dva klíče:
                     
                     if not fin: # Pokud selhaly všechny 3 pokusy o spojení
                         fin = "❌ Kritická chyba při komunikaci s AI po 3 pokusech."
+                        st.session_state.posledni_analyza_vysledek = fin
+                        if btn_start: 
+                            st.session_state.hotove_vysledky.append({
+                                "Žák": soubor.name, 
+                                "Výsledek": "CHYBA", 
+                                "Zpětná vazba": fin
+                            })
                             
-                    st.session_state.posledni_analyza_vysledek = fin
-                    if btn_start: st.session_state.hotove_vysledky.append({"Žák": soubor.name, "Hodnocení": fin})
+                    # Odstraněno: st.session_state.posledni_analyza_vysledek už je nastaveno výše
                         
                     prog.progress((idx+1)/len(fronta))
                 
@@ -249,8 +263,9 @@ JSON musí obsahovat PŘESNĚ tyto dva klíče:
                 workbook = writer.book
                 worksheet = writer.sheets['Hodnocení']
                 format_wrap = workbook.add_format({'text_wrap': True, 'valign': 'top'})
-                worksheet.set_column('A:A', 30)
-                worksheet.set_column('B:B', 80, format_wrap)
+                worksheet.set_column('A:A', 30) # Žák
+                worksheet.set_column('B:B', 20, format_wrap) # Výsledek
+                worksheet.set_column('C:C', 80, format_wrap) # Zpětná vazba
             st.download_button("📥 Stáhnout Excel (.xlsx)", data=output.getvalue(), file_name="hodnoceni.xlsx")
         except Exception as e:
             st.warning(f"Nelze vytvořit Excel (chyba: {e}). Zkuste stáhnout obyčejné CSV.")
