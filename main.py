@@ -43,51 +43,6 @@ def precti_obsah_souboru(nahrany_soubor) -> str:
     except Exception as e:
         return f"❌ CHYBA ČTENÍ: {str(e)}"
 
-def spust_kod(jazyk: str, kod: str) -> str:
-    # PŘIDÁNO: Zpoždění pro ochranu bezplatného Piston API před zablokováním (Error 429)
-    time.sleep(1) 
-    
-    url = "https://emkc.org/api/v2/piston/execute"
-    jazyk = jazyk.lower()
-    if jazyk in ["js", "node"]: jazyk = "javascript"
-    if jazyk in ["ts"]: jazyk = "typescript"
-    if jazyk in ["c++"]: jazyk = "cpp"
-    
-    verze_mapa = {
-        "python": "3.10", "javascript": "18.15.0", "typescript": "5.0.3", 
-        "php": "8.2.3", "cpp": "10.2.0", "c": "10.2.0", "java": "15.0.2"
-    }
-    verze = verze_mapa.get(jazyk, "*")
-
-    payload = {
-        "language": jazyk,
-        "version": verze,
-        "files":[{"name": f"student.{jazyk}", "content": kod}]
-    }
-    try:
-        r = requests.post(url, json=payload, timeout=10)
-        if r.status_code == 429:
-            return "Chyba sandboxu: Překročen limit požadavků (Too Many Requests). Zkuste to za chvíli."
-        return r.json().get("run", {}).get("output", "Bez výstupu.")
-    except Exception as e: 
-        return f"Chyba sandboxu ({jazyk}): {str(e)}"
-
-nastroj_spustit_kod = {
-    "type": "function",
-    "function": {
-        "name": "spust_kod", 
-        "description": "Spustí zdrojový kód v zadaném programovacím jazyce a vrátí jeho výstup (stdout).", 
-        "parameters": {
-            "type": "object", 
-            "properties": {
-                "jazyk": {"type": "string", "description": "Programovací jazyk (python, javascript, php, typescript, cpp, java)."},
-                "kod": {"type": "string", "description": "Zdrojový kód ke spuštění."}
-            }, 
-            "required": ["jazyk", "kod"]
-        }
-    }
-}
-
 # ==========================================
 # 2. STAV APLIKACE (SESSION STATE)
 # ==========================================
@@ -163,7 +118,6 @@ with zalozka_hodnoceni:
         zadani = st.text_area("Zadání pro žáky:", value=st.session_state.gen_zadani, height=100)
         reseni = st.text_area("Vzorové řešení:", value=st.session_state.gen_reseni, height=100)
         instrukce = st.text_area("Kritéria (prompt):", value=st.session_state.gen_instrukce, height=150)
-        pouzit_sandbox = st.checkbox("⚙️ Aktivovat Sandbox (pouze pro reálné spuštění kódu programátorů)")
     
     with col2:
         st.warning("🔒 **GDPR Ochrana:** Nenahrávejte soubory obsahující osobní údaje žáků.")
@@ -228,36 +182,18 @@ Zpětná vazba: [2 věty k žákovi]"""
                     # Smyčka pro případné dočasné výpadky sítě (Retry logika)
                     while pokusy_site < 3:
                         try:
-                            # PŘIDÁNO: Ochrana proti nekonečnému cyklení (max 3 volání sandboxu na žáka)
-                            MAX_TOOL_CALLS = 3
-                            aktualni_tool_calls = 0
+                            resp = client.chat.completions.create(
+                                model=model_ai, 
+                                messages=historie, 
+                                temperature=0.0
+                            )
                             
-                            while aktualni_tool_calls < MAX_TOOL_CALLS:
-                                p = {"model": model_ai, "messages": historie, "temperature": 0.0}
-                                if pouzit_sandbox: p["tools"] =[nastroj_spustit_kod]
-                                resp = client.chat.completions.create(**p)
-                                
-                                if hasattr(resp, 'usage') and resp.usage: st.session_state.spotrebovane_tokeny += resp.usage.total_tokens
-                                msg = resp.choices[0].message
-                                historie.append(msg)
-                                
-                                if msg.tool_calls:
-                                    aktualni_tool_calls += 1
-                                    for tc in msg.tool_calls:
-                                        args = json.loads(tc.function.arguments)
-                                        jazyk_kodu = args.get("jazyk", "python")
-                                        zdrojovy_kod = args.get("kod", "")
-                                        res = spust_kod(jazyk_kodu, zdrojovy_kod) if tc.function.name == "spust_kod" else "Neznámý nástroj."
-                                        historie.append({"tool_call_id": tc.id, "role": "tool", "name": tc.function.name, "content": res})
-                                else:
-                                    # PŘIDÁNO: Ochrana proti prázdné odpovědi
-                                    fin = msg.content if msg.content else "⚠️ Chyba: Model nevrátil textové hodnocení."
-                                    break
+                            if hasattr(resp, 'usage') and resp.usage: 
+                                st.session_state.spotrebovane_tokeny += resp.usage.total_tokens
                             
-                            # Pokud cyklus skončil kvůli překročení limitu nástrojů
-                            if aktualni_tool_calls >= MAX_TOOL_CALLS and not fin:
-                                fin = "⚠️ Dosažen limit operací Sandboxu. Model nedokázal kód vyhodnotit. Nutná manuální kontrola."
-                            
+                            msg = resp.choices[0].message
+                            # PŘIDÁNO: Ochrana proti prázdné odpovědi
+                            fin = msg.content if msg.content else "⚠️ Chyba: Model nevrátil textové hodnocení."
                             break # Úspěch, vymaníme se z retry logiky pro síť
                             
                         except RateLimitError:
