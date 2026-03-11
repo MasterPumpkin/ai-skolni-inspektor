@@ -11,11 +11,24 @@ from openai import OpenAI, RateLimitError
 
 
 # ==========================================
+# 0. KONFIGURACE A BEZPEČNOSTNÍ LIMITY
+# ==========================================
+MAX_CHARS_STUDENT = 50_000 # Limit znaků odesílaných do AI (cca 12k tokenů)
+MAX_FILE_SIZE_MB = 10      # Maximální velikost nahraného souboru
+MAX_PDF_PAGES = 20         # Maximální počet stran v PDF
+MAX_IPYNB_CELLS = 100      # Maximální počet buněk v Jupyter Notebooku
+
+# ==========================================
 # 1. POMOCNÉ FUNKCE (Čištění a čtení)
 # ==========================================
 def vycisti_notebook(obsah_json) -> str:
     text_k_analyze = ""
-    for bunka in obsah_json.get("cells",[]):
+    bunky = obsah_json.get("cells", [])
+    if len(bunky) > MAX_IPYNB_CELLS:
+        text_k_analyze += f"⚠️ VAROVÁNÍ: Notebook je příliš dlouhý. Zpracováno pouze prvních {MAX_IPYNB_CELLS} buněk.\n\n"
+        bunky = bunky[:MAX_IPYNB_CELLS]
+        
+    for bunka in bunky:
         if bunka["cell_type"] in ["code", "markdown"]:
             zdroj = "".join(bunka["source"]).strip()
             if zdroj:
@@ -24,22 +37,41 @@ def vycisti_notebook(obsah_json) -> str:
     return text_k_analyze
 
 def precti_obsah_souboru(nahrany_soubor) -> str:
+    # 1. Kontrola velikosti souboru
+    if nahrany_soubor.size > MAX_FILE_SIZE_MB * 1024 * 1024:
+        return f"❌ CHYBA: Soubor '{nahrany_soubor.name}' je příliš velký (max {MAX_FILE_SIZE_MB} MB)."
+
     jmeno = nahrany_soubor.name.lower()
+    text = ""
     try:
         if jmeno.endswith('.ipynb'):
-            return vycisti_notebook(json.loads(nahrany_soubor.getvalue().decode("utf-8")))
+            text = vycisti_notebook(json.loads(nahrany_soubor.getvalue().decode("utf-8")))
         elif jmeno.endswith('.pdf'):
             with pdfplumber.open(nahrany_soubor) as pdf:
-                text = "\n".join([p.extract_text() for p in pdf.pages if p.extract_text()])
-                return text if text.strip() else "❌ CHYBA: PDF neobsahuje čitelný text (pravděpodobně jde o naskenovaný obrázek)."
+                pocet_stran = len(pdf.pages)
+                if pocet_stran > MAX_PDF_PAGES:
+                    text += f"⚠️ VAROVÁNÍ: PDF má {pocet_stran} stran. Zpracováno pouze prvních {MAX_PDF_PAGES}.\n\n"
+                    pdf_range = pdf.pages[:MAX_PDF_PAGES]
+                else:
+                    pdf_range = pdf.pages
+                    
+                text += "\n".join([p.extract_text() for p in pdf_range if p.extract_text()])
+                if not text.strip():
+                    return "❌ CHYBA: PDF neobsahuje čitelný text (pravděpodobně jde o naskenovaný obrázek)."
         elif jmeno.endswith('.docx'):
             doc = docx.Document(nahrany_soubor)
-            return "\n".join([para.text for para in doc.paragraphs])
+            text = "\n".join([para.text for para in doc.paragraphs])
         else:
             try:
-                return nahrany_soubor.getvalue().decode("utf-8")
+                text = nahrany_soubor.getvalue().decode("utf-8")
             except UnicodeDecodeError:
                 return "❌ CHYBA: Tento formát nelze přečíst jako text (pravděpodobně jde o nepodporovaný nebo binární soubor)."
+        
+        # 2. Limit znaků pro AI
+        if len(text) > MAX_CHARS_STUDENT:
+            return text[:MAX_CHARS_STUDENT] + f"\n\n... [⚠️ TEXT ZKRÁCEN Z BEZPEČNOSTNÍCH DŮVODŮ NA {MAX_CHARS_STUDENT} ZNAKŮ]"
+        return text
+
     except Exception as e:
         return f"❌ CHYBA ČTENÍ: {str(e)}"
 
@@ -64,7 +96,7 @@ klic_ok = False
 if poskytovatel == "Groq (Zdarma/Bleskový)":
     api_klic = st.sidebar.text_input("🔑 Groq API klíč:", type="password")
     base_url = "https://api.groq.com/openai/v1"
-    model_ai = st.sidebar.selectbox("Model:",["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"])
+    model_ai = st.sidebar.selectbox("Model:",["llama-3.3-70b-versatile", "llama-3.1-8b-instant"])
     if api_klic.startswith("gsk_"): klic_ok = True
 else:
     api_klic = st.sidebar.text_input("🔑 OpenAI API klíč:", type="password")
@@ -101,7 +133,11 @@ with zalozka_priprava:
                         ],
                         response_format={"type": "json_object"}
                     )
-                    if hasattr(resp, 'usage') and resp.usage: st.session_state.spotrebovane_tokeny += resp.usage.total_tokens
+                    # VYLEPŠENO: Robustní počítání tokenů
+                    u = getattr(resp, 'usage', None)
+                    if u:
+                        st.session_state.spotrebovane_tokeny += getattr(u, 'total_tokens', getattr(u, 'prompt_tokens', 0) + getattr(u, 'completion_tokens', 0))
+                    
                     txt = resp.choices[0].message.content or "{}"
                     try:
                         data = json.loads(txt)
@@ -203,8 +239,10 @@ JSON musí obsahovat PŘESNĚ tyto dva klíče:
                                 response_format={"type": "json_object"}
                             )
                             
-                            if hasattr(resp, 'usage') and resp.usage: 
-                                st.session_state.spotrebovane_tokeny += resp.usage.total_tokens
+                            # VYLEPŠENO: Robustní počítání tokenů
+                            u = getattr(resp, 'usage', None)
+                            if u:
+                                st.session_state.spotrebovane_tokeny += getattr(u, 'total_tokens', getattr(u, 'prompt_tokens', 0) + getattr(u, 'completion_tokens', 0))
                             
                             msg = resp.choices[0].message
                             # PŘIDÁNO: Robustní parsování JSON výsledku
