@@ -1,5 +1,20 @@
+# 1. Ignoruj úplně všechno
 *
-!main.py
+
+# 2. Povol konkrétní soubory v hlavním adresáři
+!.gitignore
+!rozcestnik.py
 !README.md
 !requirements.txt
-!.gitignore
+
+# 3. Povol samotnou složku pages/ (aby se do ní Git vůbec podíval)
+!pages/
+
+# 4. Ignoruj všechno UVNITŘ složky pages/
+pages/*
+
+# 5. Ale povol tyto konkrétní skripty uvnitř pages/
+!pages/1_🤖_Super_Agent.py
+!pages/2_🎓_Inspektor.py
+!pages/3_🧠_Metodik.py
+!pages/4_🕹️_Kvizovac.py

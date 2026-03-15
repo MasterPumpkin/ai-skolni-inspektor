@@ -89,20 +89,29 @@ if "spotrebovane_tokeny" not in st.session_state: st.session_state.spotrebovane_
 st.set_page_config(page_title="AI Školní Inspektor", page_icon="🎓", layout="wide")
 st.title("🎓 AI Školní Inspektor v1.1")
 
-st.sidebar.markdown("### ⚙️ Nastavení AI")
-poskytovatel = st.sidebar.selectbox("Poskytovatel AI:",["Groq (Zdarma/Bleskový)", "OpenAI (Placené/Nejchytřejší)"])
-
+st.sidebar.markdown("### ⚙️ Nastavení API")
 klic_ok = False
-if poskytovatel == "Groq (Zdarma/Bleskový)":
-    api_klic = st.sidebar.text_input("🔑 Groq API klíč:", type="password")
-    base_url = "https://api.groq.com/openai/v1"
-    model_ai = st.sidebar.selectbox("Model:",["llama-3.3-70b-versatile", "llama-3.1-8b-instant"])
-    if api_klic.startswith("gsk_"): klic_ok = True
+
+if "api_klic" in st.session_state and st.session_state.api_klic:
+    api_klic = st.session_state.api_klic
+    model_ai = st.session_state.get("model_ai", "llama-3.3-70b-versatile")
+    base_url = "https://api.groq.com/openai/v1" if api_klic.startswith("gsk_") else "https://api.openai.com/v1"
+    klic_ok = True
+    st.sidebar.success("✅ API klíč je sdílen z Hlavního rozcestníku.")
 else:
-    api_klic = st.sidebar.text_input("🔑 OpenAI API klíč:", type="password")
-    base_url = "https://api.openai.com/v1"
-    model_ai = st.sidebar.selectbox("Model:", ["gpt-4o-mini", "gpt-4o"])
-    if api_klic.startswith("sk-"): klic_ok = True
+    poskytovatel = st.sidebar.selectbox("Poskytovatel AI:",["Groq (Zdarma/Bleskový)", "OpenAI (Placené/Nejchytřejší)"])
+
+    klic_ok = False
+    if poskytovatel == "Groq (Zdarma/Bleskový)":
+        api_klic = st.sidebar.text_input("🔑 Groq API klíč:", type="password")
+        base_url = "https://api.groq.com/openai/v1"
+        model_ai = st.sidebar.selectbox("Model:",["llama-3.3-70b-versatile", "llama-3.1-8b-instant"])
+        if api_klic.startswith("gsk_"): klic_ok = True
+    else:
+        api_klic = st.sidebar.text_input("🔑 OpenAI API klíč:", type="password")
+        base_url = "https://api.openai.com/v1"
+        model_ai = st.sidebar.selectbox("Model:", ["gpt-4o-mini", "gpt-4o"])
+        if api_klic.startswith("sk-"): klic_ok = True
 
 st.sidebar.markdown("---")
 # PŘIDÁNO: Placeholder pro živou aktualizaci tokenů
@@ -308,6 +317,7 @@ JSON musí obsahovat PŘESNĚ tyto dva klíče:
         try:
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                # 1. List s výsledky žáků
                 df.to_excel(writer, index=False, sheet_name='Hodnocení')
                 workbook = writer.book
                 worksheet = writer.sheets['Hodnocení']
@@ -315,6 +325,17 @@ JSON musí obsahovat PŘESNĚ tyto dva klíče:
                 worksheet.set_column('A:A', 30) # Žák
                 worksheet.set_column('B:B', 20, format_wrap) # Výsledek
                 worksheet.set_column('C:C', 80, format_wrap) # Zpětná vazba
+                
+                # 2. PŘIDÁNO: Skrytý list s kontextem pro Metodika
+                df_kontext = pd.DataFrame({
+                    "Klíč": ["Zadání", "Vzorové řešení", "Kritéria (Prompt)"],
+                    "Hodnota": [st.session_state.gen_zadani, st.session_state.gen_reseni, st.session_state.gen_instrukce]
+                })
+                df_kontext.to_excel(writer, index=False, sheet_name='Kontext')
+                worksheet_kontext = writer.sheets['Kontext']
+                worksheet_kontext.set_column('A:A', 20, format_wrap)
+                worksheet_kontext.set_column('B:B', 100, format_wrap)
+
             st.download_button("📥 Stáhnout Excel (.xlsx)", data=output.getvalue(), file_name="hodnoceni.xlsx")
         except Exception as e:
             st.warning(f"Nelze vytvořit Excel (chyba: {e}). Zkuste stáhnout obyčejné CSV.")
