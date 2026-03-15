@@ -42,6 +42,8 @@ st.sidebar.markdown("---")
 st.sidebar.metric("🪙 Celkem spotřebováno tokenů", f"{st.session_state.spotrebovane_tokeny:,}".replace(",", " "))
 st.sidebar.caption("Toto počítadlo se sčítá napříč všemi nástroji v menu.")
 
+st.info("💡 **Kde získat API klíč?**\nJděte na [console.groq.com](https://console.groq.com/keys) -> Login -> Create API Key")
+
 # 3. Přehled modulů
 st.markdown("---")
 st.markdown("### 👈 Vyberte si nástroj v levém panelu")
